@@ -5,32 +5,22 @@ function JAWS(nCPU) {
     this.merge = [0];
     this.SIMD = false;
     this.ext = null;
-    this.debug = false;
+    this.debug = true;
     this.useCPU = true;
-    this.useGPU = true;
 
 	/* Configurations */
-    var numCPU = 10;                // number of CPU cores
-	var growthRate = 1.5;
-    var maxWorkGroupSize = 1024;    // maximum Work Group Size for GPU
-	var minSlope = -0.05;
-    var maxSlope = 0.05;
-    var useShare = true;           	// true: use sharedData, false: not use
-    var OPT = true;                 // true: dynamic chunk size, false: static chunk size;
+    var numCPU = 4;                 // number of CPU cores
 
     /* Measurement */
     var cpuExe = 0;
-    var gpuExe = 0;
     var cpuEnd = 0;
-    var gpuEnd = 0;
 
     /* Global variables */
     var done;                       // completed items
     var offset;                     // next item index
     var DATA_SIZE;                  // total data size for chunking
     var ext;                        // external function
-    var opt = OPT;                  // true: dynamic chunk size, false: static chunk size;
-    var PATH = "../../jslib/";
+    var PATH = "../jslib/";
     var that = this;
 
     if (nCPU)
@@ -99,7 +89,6 @@ function JAWS(nCPU) {
         this.JS = new Array();
         this.CL = new Array();
         this.argType = new Array();
-        this.argShare = new Array();
         this.argNShare = new Array();
         this.merge = new Array();
 
@@ -138,27 +127,10 @@ function JAWS(nCPU) {
             }
         };
 
-        this.setSharedFloat32 = function(array, index) {
-            for (var i=0; i<numCPU; i++) {
-                worker[i].setSharedFloat32(array, index);
-            }
-        };
-
-        this.setSharedUint8 = function(array, index) {
-            for (var i=0; i<numCPU; i++) {
-                worker[i].setSharedUint8(array, index);
-            }
-        };
-
-        this.setSharedUint8C = function(array, index) {
-            for (var i=0; i<numCPU; i++) {
-                worker[i].setSharedUint8C(array, index);
-            }
-        };
-
         this.init = function(func, type, nshare, merge) {
             for (var i=0; i<numCPU; i++) {
-                worker[i].postMessage({mode: "init", func: func, argType: type, argNShare: nshare, useShare: useShare, merge: merge, SIMD: that.SIMD});
+                worker[i].postMessage({mode: "init", func: func, argType: type, argNShare: nshare,
+                                       merge: merge, SIMD: that.SIMD});
             }
         };
 
@@ -190,15 +162,14 @@ function JAWS(nCPU) {
             done += chunkSize;
             CPU.done += chunkSize;
 
-            if (useShare === false) {
-                var jid = job.complete;
-                for (var i in e.data.output) {
-                    job.argNShare[jid][job.merge[jid][i]].set(e.data.output[i], e.data.offset);
-                }
+            var jid = job.complete;
+            for (var i in e.data.output) {
+                job.argNShare[jid][job.merge[jid][i]].set(e.data.output[i], e.data.offset);
             }
 
             wait ++;
             if (wait == numCPU) {
+                console.log("wait " + wait);
                 wait = 0;
                 // debug("CPU end");
                 end = timer.getTime();
@@ -206,39 +177,6 @@ function JAWS(nCPU) {
                 CPU.time += end - start;
                 CPU.thruput = CPU.done/CPU.time;
                 CPU.scheduler.push(CPU.thruput, end);
-
-                if (opt) {
-                    if(GPU.thruput != 0 && (DATA_SIZE - offset) > DATA_SIZE*0.1){
-                        var slope = CPU.scheduler.getSlope();
-                        if (slope > minSlope && slope < maxSlope) {
-                            opt = false;
-                            var partition = parseInt((DATA_SIZE - offset) * (GPU.thruput / (CPU.thruput + GPU.thruput)));
-                            if(partition > 0){
-                                GPU.chunkSize = partition;
-                                    GPU.chunkSize = getChunkSize(GPU.chunkSize); 
-                                }
-                                if(DATA_SIZE - offset - GPU.chunkSize > 0)
-                                    CPU.chunkSize = DATA_SIZE - offset - GPU.chunkSize;
-                                debug("ccccc");
-                            debug("cpuSlope:  "+slope);
-                            debug("DATA_SIZE - offset: "+(DATA_SIZE - offset));
-                            debug("CPU.thruput:  "+CPU.thruput);
-                            debug("GPU.thruput:  "+GPU.thruput);
-                            debug("CPU.chunkSize:  "+CPU.chunkSize);
-                            debug("GPU.chunkSize:  "+GPU.chunkSize);
-                        } 
-                    	else {
-                        	CPU.chunkSize = parseInt(CPU.chunkSize * growthRate);
-                        	//CPU.chunkSize = CPU.chunkSize + growthSize;
-                    	}
-                    }
-                    else {
-						CPU.chunkSize = parseInt(CPU.chunkSize * growthRate);
-                        //CPU.chunkSize = CPU.chunkSize + growthSize;
-                    }
-                }
-                
-                // debug("CPU thruput: " + CPU.thruput + " , chunkSize " + CPU.chunkSize);
 
                 if (DATA_SIZE - offset >= CPU.chunkSize) {
                     CPU.run();
@@ -253,116 +191,6 @@ function JAWS(nCPU) {
             }
         }
     };
-
-
-    /* GPU worker */
-    var GPU = new function() {
-        this.chunkSize;
-        var wait = 0;
-        var start = 0;
-        var end = 0;
-        this.done = 0;
-        this.time = 0;
-        this.thruput = 0;
-        this.scheduler = new Scheduler();
-
-        var worker = createWorker(PATH+"workerGPU.js");
-        worker.onmessage = onMsg;
-        worker.onerror = function(e) {
-            throw e.message + " @ workerGPU.js:" + e.lineno;
-        };
-
-        this.setSharedFloat32 = function(array, index) {
-            worker.setSharedFloat32(array, index);
-        };
-
-        this.setSharedUint8 = function(array, index) {
-            worker.setSharedUint8(array, index);
-        };
-
-        this.setSharedUint8C = function(array, index) {
-            worker.setSharedUint8C(array, index);
-        };
-
-		this.init = function(kernel, type, nshare, merge, kernelName) {
-            worker.postMessage({mode: "init", kernel: kernel, argType: type, argNShare: nshare, useShare: useShare, merge: merge, SIMD: that.SIMD, kernelName: kernelName});
-        };
-
-        this.run = function() {
-            // debug("GPU start");
-            start = timer.getTime();
-            // debug("GPU run: " + offset + ", " + this.chunkSize + ", " + DATA_SIZE);
-            if (GPU.chunkSize > 0) {
-                worker.postMessage({mode: "run", offset: offset, chunkSize: GPU.chunkSize});
-                offset += GPU.chunkSize;
-            }
-        };
-
-        /* GPU onmessage */
-        function onMsg(e) {
-            var chunkSize = e.data.chunkSize;
-            done += chunkSize;
-            GPU.done += chunkSize;
-
-            if (useShare === false) {
-                var jid = job.complete;
-                for (var i in e.data.output) {
-                    job.argNShare[jid][job.merge[jid][i]].set(e.data.output[i], e.data.offset);
-                }
-            }
-
-            // debug("GPU end");
-            end = timer.getTime();
-            gpuEnd = end;
-            GPU.time += end - start;
-            GPU.thruput = GPU.done/GPU.time;
-            GPU.scheduler.push(GPU.thruput, end);
-
-            if (opt) {
-				if(CPU.thruput != 0 && (DATA_SIZE - offset) > DATA_SIZE*0.1){
-                    var slope = GPU.scheduler.getSlope();
-                    if (slope > minSlope && slope < maxSlope) {
-                        opt = false;
-                        var partition = parseInt((DATA_SIZE - offset) * (GPU.thruput / (CPU.thruput + GPU.thruput)));
-                        if(partition > 0){
-                            GPU.chunkSize = partition;
-                            GPU.chunkSize = getChunkSize(GPU.chunkSize); 
-                        }
-                        if(DATA_SIZE - offset - GPU.chunkSize > 0)
-                            CPU.chunkSize = DATA_SIZE - offset - GPU.chunkSize;
-                        debug("ggggg");
-                        debug("gpuSlope:  "+slope);
-                        debug("DATA_SIZE - offset: "+(DATA_SIZE - offset));
-                        debug("CPU.thruput:  "+CPU.thruput);
-                        debug("GPU.thruput:  "+GPU.thruput);
-                        debug("CPU.chunkSize:  "+CPU.chunkSize);
-                        debug("GPU.chunkSize:  "+GPU.chunkSize);
-                    } 
-                	else {
-                    	GPU.chunkSize = parseInt(GPU.chunkSize * growthRate);
-                    	//GPU.chunkSize = GPU.chunkSize + growthSize;
-                	}
-                }
-                else {
-                    GPU.chunkSize = parseInt(GPU.chunkSize * growthRate);
-                    //GPU.chunkSize = GPU.chunkSize + growthSize;
-                }
-            }
-            // debug("GPU thruput: " + GPU.thruput + " , chunkSize " + GPU.chunkSize);
-
-            GPU.chunkSize = getChunkSizeCeil(GPU.chunkSize);
-            if (DATA_SIZE - offset >= GPU.chunkSize) {
-                GPU.run();
-
-            } else if (DATA_SIZE - offset > 0) {
-                GPU.chunkSize = getChunkSize(DATA_SIZE - offset);
-                GPU.run();
-
-            } else if (done == DATA_SIZE) {
-                finishJob();
-            }
-        }
-    }
 
 
     /* src */
@@ -389,38 +217,22 @@ function JAWS(nCPU) {
     this.arg = function() {
         var args = Array.prototype.slice.call(arguments);
         var argType = new Array();
-        var argShare = new Array();
         var argNShare = new Array();
 
         for (var i in args) {
             var val = args[i];
 
             if (val instanceof Float32Array) {
-                if (useShare) {
-                    argType.push("shareFloat32");
-                    argShare.push(val);
-                } else {
-                    argType.push("typedArray");
-                    argNShare.push(val);
-                }
+                argType.push("typedArray");
+                argNShare.push(val);
 
             } else if (val instanceof Uint8ClampedArray) {
-                if (useShare) {
-                    argType.push("shareUint8C");
-                    argShare.push(val);
-                } else {
-                    argType.push("typedArray");
-                    argNShare.push(val);
-				}
+                argType.push("typedArray");
+                argNShare.push(val);
 
-			} else if (val instanceof Uint8Array) {
-                if (useShare) {
-                    argType.push("shareUint8");
-                    argShare.push(val);
-                } else {
-                    argType.push("typedArray");
-                    argNShare.push(val);
-                }
+            } else if (val instanceof Uint8Array) {
+                argType.push("typedArray");
+                argNShare.push(val);
 
             } else {
                 if (isInt(val)) {
@@ -435,7 +247,6 @@ function JAWS(nCPU) {
         var index = job.index;
         job.data_size[index]    = args[0].length;
         job.argType[index]      = argType;
-        job.argShare[index]     = argShare;
         job.argNShare[index]    = argNShare;
     };
 
@@ -511,16 +322,12 @@ function JAWS(nCPU) {
         var time = timer.end - timer.start;
         // debug("DONE: " + (time-2000) + " ms");
         debug("CPU works: " + CPU.time + " ms (" + CPU.done + " elements)");
-        debug("GPU works: " + GPU.time + " ms (" + GPU.done + " elements)");
         cpuExe += CPU.time;
-        gpuExe += GPU.time;
 
         if (ext != null) {
 			debug("DONE: " + (time-2000) + " ms");
             console.log("cpuExe: " + cpuExe + " ms");
-            console.log("gpuExe: " + gpuExe + " ms");
             console.log("cpuEnd: " + cpuEnd + " ms");
-            console.log("gpuEnd: " + gpuEnd + " ms");
             ext();
         }
         job.complete++;
@@ -541,93 +348,21 @@ function JAWS(nCPU) {
             DATA_SIZE /= 4;
         ext = job.ext[i];
 
-        if ((i > 0) && (job.id[i] == job.id[i-1]) && that.useGPU && that.useCPU) {
-			var factor;
-
-//			if ((Math.max(CPU.thruput, GPU.thruput) > Math.min(CPU.thruput, GPU.thruput) * 10) && balanced)
-			if (CPU.scheduler.getSlope() < maxSlope || GPU.scheduler.getSlope() < maxSlope) {
-				factor = 0.5;
-				opt = false;
-			} else {
-				factor = 0.01;
-				opt = OPT;
-			}
-
-            debug(" * ratio: " + GPU.thruput / (CPU.thruput + GPU.thruput));
-            debug(" * factor: " + factor);
-            debug(" * CPU.slope: " + CPU.scheduler.getSlope());
-            debug(" * GPU.slope: " + GPU.scheduler.getSlope());
-            GPU.chunkSize = getChunkSizeCeil((DATA_SIZE * factor) * GPU.thruput / (CPU.thruput + GPU.thruput));
-            CPU.chunkSize = parseInt(DATA_SIZE * factor - GPU.chunkSize);
-
-        } else {
-            var chunkSize = getChunkSize(DATA_SIZE * that.initRate);
- 
-            if (that.useGPU)
-                GPU.chunkSize = chunkSize;
-            else
-                GPU.chunkSize = 0;
-
-            CPU.chunkSize = chunkSize;
-            if (((DATA_SIZE - GPU.chunkSize) < CPU.chunkSize))
-                CPU.chunkSize = DATA_SIZE - GPU.chunkSize;
-
-			opt = OPT;
-        }
-
-
         CPU.scheduler = new Scheduler();
         CPU.thruput = 0;
-        GPU.scheduler = new Scheduler();
-        GPU.thruput = 0;
+        CPU.chunkSize = 512;
 
         CPU.time = 0;
         CPU.done = 0;
         
-        GPU.time = 0;
-        GPU.done = 0;
-
         debug("DATA_SIZE: " + DATA_SIZE);
-        debug("init GPU chunkSize: " + GPU.chunkSize);
         debug("init CPU chunkSize: " + CPU.chunkSize);
-
-        if (useShare)
-            shareTypedArray(job.argShare[i]);
-		
-		if (that.useGPU) {
-            GPU.init(job.CL[i], job.argType[i], job.argNShare[i], job.merge[i], job.id[i]);
-            GPU.run();
-        }
 
         if (that.useCPU) {
             CPU.init(job.JS[i], job.argType[i], job.argNShare[i], job.merge[i]);
             CPU.run();
 		}
 	}
-
-    function shareTypedArray(array) {
-        var shareFloat32 = 0;
-        var shareUint8 = 0;
-        var shareUint8c = 0;
-        for (var i in array) {
-            if (array[i] instanceof Float32Array) {
-                CPU.setSharedFloat32(array[i], shareFloat32);
-                GPU.setSharedFloat32(array[i], shareFloat32);
-                shareFloat32++;
-
-            } else if (array[i] instanceof Uint8ClampedArray) {
-                CPU.setSharedUint8C(array[i], shareUint8c);
-                GPU.setSharedUint8C(array[i], shareUint8c);
-                shareUint8c++;
-
-            } else if (array[i] instanceof Uint8Array) {
-                CPU.setSharedUint8(array[i], shareUint8c);
-                GPU.setSharedUint8(array[i], shareUint8c);
-                shareUint8++;
-            }
-        }
-    }
-
 
     /* load kernel */
 	function loadKernel(file) {

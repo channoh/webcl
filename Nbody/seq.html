@@ -265,7 +265,8 @@
 
 <script>
     var interval;
-    var timeObj = new Date();
+    // var timeObj = new Date();
+    var timeObj = window.performance;
     var Start, End, Time;
 
     function PAPLonLoad() {
@@ -303,7 +304,8 @@
 
         // userData.tripCount++;
         // PAPL.init();
-        Start = timeObj.gettimeofday();
+        // Start = timeObj.gettimeofday();
+        Start = timeObj.now();
         interval = setInterval( PAPLrun, 0 );
         setInterval( function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
         setInterval( function() { userData.simSampler.display(); }, DISPLAYPERIOD);
@@ -313,10 +315,11 @@
 
     function PAPLrun() {
         if (tripCount == tripEnd) {
-            End = timeObj.gettimeofday();
+            // End = timeObj.gettimeofday();
+            End = timeObj.now();
             Time = End - Start;
             console.log("DONE: " + Time + " ms");
-            window.close();
+            // window.close();
         }
         tripCount++;
         //console.log(tripCount);

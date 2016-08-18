@@ -77,8 +77,10 @@ function mandelbrotCL() {
     time = new Date().getTime();
     frTimer = setInterval(fr, 500);
 	
-	timeObject = new Date();
-	Start = timeObject.gettimeofday();
+	// timeObject = new Date();
+	// Start = timeObject.gettimeofday();
+	timeObject = window.performance;
+	Start = timeObject.now();
     
 	anim();
 
@@ -119,7 +121,8 @@ function draw() {
 
     tripCount ++;
 	if (tripCount === tripEnd){
-			End = timeObject.gettimeofday();
+			// End = timeObject.gettimeofday();
+			End = timeObject.now();
 			Time = End - Start;
 			console.log("DONE: " + Time + " ms");
             window.close();
@@ -127,14 +130,14 @@ function draw() {
 }
 
 function anim(v) {
-    // if (animation === "animate") {
+    if (animation === "animate") {
         draw();
-        // if (delay === 0) {
+        if (delay === 0) {
             requestAnimFrame(anim);
-        // } else {
-            // setTimeout("requestAnimFrame(anim)", delay);
-        // }
-    // }
+        } else {
+            setTimeout("requestAnimFrame(anim)", delay);
+        }
+    }
 }
 
 function setFormula(s) {

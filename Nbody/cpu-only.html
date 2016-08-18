@@ -99,7 +99,7 @@
 </script>
 
 <script src="config.js"></script>
-<script src="../../jslib/JAWS.js"></script>
+<script src="../jslib/JAWS.js"></script>
 <!--<script src="Util/opencl.js"></script> -->
 <script src="Util/sampler.js"></script>
 <script src="Util/shader.js"></script>
@@ -114,7 +114,8 @@
 <script>
 var interval;
 var JAWS = new JAWS();
-var timeObj = new Date();
+// var timeObj = new Date();
+var timeObj = window.performance;
 var Start, End, Time;
 
 function PAPLonLoad() {
@@ -147,12 +148,11 @@ function PAPLonLoad() {
 
 
     //JAWS = new JAWS();
-    JAWS.useGPU = false;
-    JAWS.initRate = 1;
 
     // setInterval( PAPLrun, 0 );
     setTimeout(function() {
-		Start = timeObj.gettimeofday();
+		// Start = timeObj.gettimeofday();
+		Start = timeObj.now();
         PAPLrun();
         // interval = setInterval( PAPLrun, 0 );
         setInterval( function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
@@ -164,13 +164,15 @@ function PAPLonLoad() {
 
 function PAPLrun() {
     if (tripCount == tripEnd) {
-        End = timeObj.gettimeofday();
+        // End = timeObj.gettimeofday();
+        End = timeObj.now();
         Time = End - Start;
         console.log("DONE: " + Time + " ms");
-        window.close();
-        return;
+        // window.close();
+        // return;
     }
     tripCount++;
+    console.log("tripCount " + tripCount);
 
     userData.drawSampler.endFrame();    // started at beginning of previous Draw()
     userData.fpsSampler.markFrame();    // count a new frame
