@@ -9,7 +9,7 @@ function JAWS(nCPU) {
     this.useCPU = true;
 
 	/* Configurations */
-    var numCPU = 4;                 // number of CPU cores
+    var numCPU = 2;                 // number of CPU cores
 
     /* Measurement */
     var cpuExe = 0;
@@ -350,7 +350,7 @@ function JAWS(nCPU) {
 
         CPU.scheduler = new Scheduler();
         CPU.thruput = 0;
-        CPU.chunkSize = 512;
+        CPU.chunkSize = 256;
 
         CPU.time = 0;
         CPU.done = 0;

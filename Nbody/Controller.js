@@ -155,11 +155,11 @@ function ShowFLOPS() {
 }
 
 function InitParticleState() {
-    //InitRandomParticles();
-    //InitParticlesOnSphere();
-    //InitParticlesOnDisc();
+    // InitRandomParticles();
+    // InitParticlesOnSphere();
+    // InitParticlesOnDisc();
     InitParticlesOnSpinningDisc();
-    //InitParticlesOnRing();
+    // InitParticlesOnRing();
     //InitTwoParticles();
     //InitFourParticles();
 
@@ -212,17 +212,17 @@ function SetSimMode(simMode) {
 function SetDrawMode(drawMode) {
     var canvas2D = document.getElementById("canvas2D");
     var canvas3D = document.getElementById("canvas3D");
-    var div = document.getElementById("drw");
+    // var div = document.getElementById("drw");
 
     if(drawMode === JS_DRAW_MODE) {
         canvas2D.style.visibility = "visible";
         canvas3D.style.visibility = "hidden";
-        div.firstChild.nodeValue = "JS";
+        // div.firstChild.nodeValue = "JS";
     }
     else {
         canvas2D.style.visibility = "hidden";
         canvas3D.style.visibility = "visible";
-        div.firstChild.nodeValue = (userData.gl === null)? "NA" : "GL";
+        // div.firstChild.nodeValue = (userData.gl === null)? "NA" : "GL";
     }
 
     userData.drawMode = drawMode;

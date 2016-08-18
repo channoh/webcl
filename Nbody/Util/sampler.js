@@ -59,7 +59,7 @@ function MSecSampler(aSamplePeriod, aDivId) {
     this.endFrame = function() {
         if(!this.isAccumulating) return;
         this.isAccumulating = false;
-        
+       //  
     	var tNow = new Date().valueOf();	
         this.msAccumulator += (tNow - this.tStart);
 		this.frameCount++;
