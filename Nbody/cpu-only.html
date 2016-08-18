@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>NBody Simulation</title>
+<meta HTTP-EQUIV="CACHE-CONTROL" CONTENT="NO-CACHE">
+
+<style type="text/css">
+.info {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size:16px;
+    color: white;
+    text-align:right;
+}
+.btn {
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
+    font-size:16px;
+    color: black;
+    text-align:center;
+    height:30px;
+}
+.radiobtn {
+    visibility: hidden;
+    width: 60px;
+    height: 30px;
+}
+</style>
+
+<script id="point-vshader" type="x-shader/x-vertex">
+    precision mediump float;
+    uniform mat4 mvp;
+    attribute vec4 curPos;
+    attribute vec4 curVel;
+    varying vec4 vColor;
+    void main(void) {
+        vec4 pos;
+        pos.xyz = curPos.xyz;
+        pos.w  = 1.0;
+        gl_Position = mvp * pos;
+
+        float maxSize = 8.0;
+        float size = maxSize * (1.0 - curPos.z);
+        if(size < 1.0) size = 1.0;
+        if(size > maxSize) size = maxSize;
+
+        float vel = sqrt(curVel.x*curVel.x + curVel.y*curVel.y + curVel.z*curVel.z);
+        float r = abs(curVel.x)/vel;
+        float g = abs(curVel.y)/vel;
+        float b = abs(curVel.z)/vel;
+
+        vColor = vec4(r, g, b, 0.8);
+
+        gl_PointSize  = size;
+    }
+</script>
+
+<script id="point-fshader" type="x-shader/x-fragment">
+    precision mediump float;
+    varying vec4 vColor;
+    void main(void) {
+        float dx = (gl_PointCoord.x - 0.5);
+        float dy = (gl_PointCoord.y - 0.5);
+        float r = sqrt(dx*dx + dy*dy);
+        float r1 = 0.1;
+
+        if(r < 0.5)
+            //gl_FragColor = vColor;
+            gl_FragColor = 2.0 * (0.5 - r) * vColor;
+
+        if(r >= 0.5)
+            gl_FragColor[3] = 0.0;
+        else if (r < r1)
+            gl_FragColor[3] = vColor[3];
+        else
+            gl_FragColor[3] = 1.0 - ((r - r1)/(0.5 - r1))*vColor[3];
+    }
+</script>
+
+<script id="cube-vshader" type="x-shader/x-vertex">
+    precision mediump float;
+    uniform mat4 mvp;
+    attribute vec3 cube;
+    void main()
+    {
+        vec4 pos;
+        pos.xyz = cube.xyz;
+        pos.w  = 1.0;
+        gl_Position = mvp * pos;
+        //gl_Position = pos;
+    }
+</script>
+
+<script id="cube-fshader" type="x-shader/x-fragment">
+    precision mediump float;
+    void main() {
+        gl_FragColor = vec4(1, 1, 1, 1);
+    }
+</script>
+
+<script src="config.js"></script>
+<script src="../../jslib/JAWS.js"></script>
+<!--<script src="Util/opencl.js"></script> -->
+<script src="Util/sampler.js"></script>
+<script src="Util/shader.js"></script>
+<script src="Util/J3DIMath.js"></script>
+<script src="Controller.js"></script>
+<script src="InitSim.js"></script>
+<script src="SimCL.js"></script>
+<script src="SimJS.js"></script>
+<script src="DrawGL.js"></script>
+<script src="DrawJS.js"></script>
+
+<script>
+var interval;
+var JAWS = new JAWS();
+var timeObj = new Date();
+var Start, End, Time;
+
+function PAPLonLoad() {
+    if(WINW !== WINH) {
+        console.error("Error: drawing canvas must be square");
+        return;
+    }
+
+    userData = new UserData();
+    userData.fpsSampler = new FpsSampler(SAMPLEPERIOD, "fps");
+    userData.simSampler = new MSecSampler(SAMPLEPERIOD, "sms");
+    userData.drawSampler = new MSecSampler(SAMPLEPERIOD, "dms");
+
+    userData.curPos = new Float32Array(NBODY * POS_ATTRIB_SIZE);
+    userData.curVel = new Float32Array(NBODY * VEL_ATTRIB_SIZE);
+    userData.nxtPos = new Float32Array(NBODY * POS_ATTRIB_SIZE);
+    userData.nxtVel = new Float32Array(NBODY * VEL_ATTRIB_SIZE);
+
+    InitParticleState();
+
+    userData.ctx = InitJS("canvas2D");
+    userData.gl  = InitGL("canvas3D");
+    // userData.cl  = InitCL();
+
+    SetSimMode(JS_SIM_MODE);
+    SetDrawMode(JS_DRAW_MODE);
+
+    /* Run */
+    // PAPLrun();
+
+
+    //JAWS = new JAWS();
+    JAWS.useGPU = false;
+    JAWS.initRate = 1;
+
+    // setInterval( PAPLrun, 0 );
+    setTimeout(function() {
+		Start = timeObj.gettimeofday();
+        PAPLrun();
+        // interval = setInterval( PAPLrun, 0 );
+        setInterval( function() { userData.fpsSampler.display(); }, DISPLAYPERIOD);
+        setInterval( function() { userData.simSampler.display(); }, DISPLAYPERIOD);
+        setInterval( function() { userData.drawSampler.display(); }, DISPLAYPERIOD);
+        setInterval( ShowFLOPS, 2*DISPLAYPERIOD);
+    }, 2000);
+}
+
+function PAPLrun() {
+    if (tripCount == tripEnd) {
+        End = timeObj.gettimeofday();
+        Time = End - Start;
+        console.log("DONE: " + Time + " ms");
+        window.close();
+        return;
+    }
+    tripCount++;
+
+    userData.drawSampler.endFrame();    // started at beginning of previous Draw()
+    userData.fpsSampler.markFrame();    // count a new frame
+    userData.simSampler.startFrame();
+
+    // PAPL.timer("CPU0 start");
+    // SimulateJS();
+    // PAPL.timer("CPU0 end");
+
+    // userData.simSampler.endFrame();
+    // userData.drawSampler.startFrame();
+    // Draw();
+
+    JAWS.src("nbody.js", "nbody.cl");
+    JAWS.arg(userData.curPos, userData.curVel, NBODY, DT, EPSSQR, userData.nxtPos, userData.nxtVel);
+    JAWS.merge = [5, 6];
+    JAWS.SIMD = true;
+    JAWS.ext = function() {
+        userData.curPos.set(userData.nxtPos, 0);
+        userData.curVel.set(userData.nxtVel, 0);
+
+        userData.simSampler.endFrame();
+        userData.drawSampler.startFrame();
+        Draw();
+        PAPLrun();
+    };
+    JAWS.run();
+}
+
+</script>
+
+</head>
+
+<body onload="PAPLonLoad()" bgColor=black>
+<div style="position:absolute; left:0px; top:0px">
+    <div          class="info" style="position:absolute; left:  0px; top:15px; width:130px;">Frame Rate:</div>
+    <div id="fps" class="info" style="position:absolute; left:115px; top:15px; width: 60px;">XX</div>
+
+    <div id="f1"  class="info" style="position:absolute; left:160px; top:15px; width:130px;">TEXT:</div>
+    <div id="f2"  class="info" style="position:absolute; left:280px; top:15px; width: 60px;">XX</div>
+
+    <div          class="info" style="position:absolute; left:  0px; top:40px; width:130px;">Particles:</div>
+    <div id="num" class="info" style="position:absolute; left:115px; top:40px; width: 60px;">XX</div>
+
+    <div id="b1"  class="info" style="position:absolute; left: 30px; top:65px">
+        <button type="button" class="btn" style="width:160px; height=40px;" onClick="ToggleSimMode()">Toggle Sim Mode</button>
+    </div>
+    <div          class="info" style="position:absolute; left:185px; top:70px; width: 60px;">Sim:</div>
+    <div id="sim" class="info" style="position:absolute; left:215px; top:70px; width: 60px;">XX</div>
+    <div id="sms" class="info" style="position:absolute; left:260px; top:70px; width: 80px;">XX</div>
+
+    <div id="b2"  class="info" style="position:absolute; left: 30px; top:100px">
+        <button type="button"  class="btn" style="width:160px;" onClick="ToggleDrawMode()">Toggle Draw Mode</button>
+    </div>
+    <div          class="info" style="position:absolute; left:185px; top:105px; width: 60px;">Draw:</div>
+    <div id="drw" class="info" style="position:absolute; left:215px; top:105px; width: 60px;">XX</div>
+    <div id="dms" class="info" style="position:absolute; left:260px; top:105px; width: 80px;">XX</div>
+
+    <div id="b3"  class="info" style="position:absolute; left: 30px; top:135px;">
+        <button type="button"  class="btn" style="width:160px;" onClick="ToggleSimRunning()">Start/Stop Sim</button>
+    </div>
+
+    <div id="b4"  class="info" style="position:absolute; left: 200px; top:135px;">
+        <button type="button"  class="btn" style="width:160px;" onClick="Toggle3D()">Start/Stop 3D</button>
+    </div>
+
+    <div id="devices" class="radiobtn">
+        <div id="b5" class="info" style="position:absolute; left: 390px; top:135px;">
+            GPU<input type="radio" name="device" id="GPUradio" onclick="ToggleDevice('GPU');" checked="true">
+        </div>
+        <div id="b6" class="info" style="position:absolute; left: 450px; top:135px;">
+            CPU<input type="radio" name="device" id="CPUradio" onclick="ToggleDevice('CPU');">
+        </div>
+    </div>
+</div>
+
+<!-- canvas must be square since simulator works in normalized device coordinates -->
+<canvas id="canvas2D" style="z-index: -1; position:absolute; left:0px; top:200px;"></canvas>
+<canvas id="canvas3D" style="z-index: -1; position:absolute; left:0px; top:200px;"></canvas>
+</body>
+</html>

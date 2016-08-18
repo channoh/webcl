@@ -1,0 +1,222 @@
+<html>
+<!--
+    Based on: http://www.ibiblio.org/e-notes/webcl/mandelbrot_exp.html
+-->
+<head>
+<title>The Mandelbrot set explorer</title>
+
+<script src="../common/gl.js" type="text/javascript"></script>
+<script src="../common/webgl-utils.js" type="text/javascript"></script>
+<script src="../common/webcl.js" type="text/javascript"></script>
+<script src="config.js"></script>
+<script src="../../jslib/JAWS.js"></script>
+
+<script>
+function iClamp(i)
+{
+  return Math.min(Math.max(0, i), 255);
+}
+
+function ckManZ2sm(col, scale, Ro, Io, width) {
+    for (var x = 0; x < width; x++) {
+        for (var y = 0; y < width; y++) {
+            var Cr = (x - 256) * scale + Ro,  Ci = -(y - 256) * scale + Io;
+            var I=0.0, R=0.0,  I2=0.0, R2=0.0;
+            var n=0;
+            while ( (R2+I2 < 100.0) && (n < 1024) ){
+                I=(R+R)*I+Ci;  R=R2-I2+Cr;  R2=R*R;  I2=I*I;  n++;
+            }
+            if (n == 1024) {
+                col[(y*width + x)*4] = 0;
+                col[(y*width + x)*4 + 1] = 0;
+                col[(y*width + x)*4 + 2] = 0;
+                col[(y*width + x)*4 + 3] = 255;
+            } else {
+                var cx = 1.4427*(Math.log(Math.log(R2+I2)) - 1.52718);
+                var c = parseInt(((n % 64) - cx)*24.0);
+                col[(y*width + x)*4] = iClamp( parseInt(Math.abs(c - 768)) - 384 );
+                col[(y*width + x)*4 + 1] =  iClamp( 512 - parseInt(Math.abs(c - 512)) );
+                col[(y*width + x)*4 + 2] = iClamp( 512 - parseInt(Math.abs(c - 1024)) );
+                col[(y*width + x)*4 + 3] = 255;
+                /*
+                col[y*width + x] = (uchar4)(
+                        iClamp( parseInt(Math.abs(c - 768)) - 384 ),
+                        iClamp( 512 - parseInt(Math.abs(c - 512)) ),
+                        iClamp( 512 - parseInt(Math.abs(c - 1024)) ),
+                        255);
+                        */
+            }
+        }
+    }
+}
+
+
+</script>
+
+<script type="text/javascript">
+
+var ctx_c, imgd, scale = 0.01, zoom = 1.01, zoom2 = 1.05,
+    Ro = 0.37014983130958534, Io = 0.10511722270082503, dR = -Ro, dI = -Io,
+    animation = "animate", time, frames = 0, delay = 0;
+var program, kernel, cmdQueue, bufCol, outBuffer, bufSize, frTimer, useGPU = true;
+var globalWS = new Int32Array(2);
+var localWorkSize = new Int32Array(2);
+
+var timeObject, Start, End, Time;
+
+var JAWS = new JAWS();
+JAWS.useCPU = false;
+JAWS.initRate = 1;
+
+function mandelbrotCL() {
+    var canvas = document.getElementById("c");
+    canvas.width = N;
+    canvas.height = N;
+    canvas.addEventListener('mouseup', ev_mouseup, false);
+
+    init_gl(canvas, false);
+
+    nx = canvas.width;
+    ny = canvas.height;
+
+
+    outBuffer = new Uint8Array(Uint8Array.BYTES_PER_ELEMENT * nx * ny * 4);
+    time = new Date().getTime();
+    frTimer = setInterval(fr, 500);
+    setTimeout(function() {
+		timeObject = new Date();
+		Start = timeObject.gettimeofday();
+		anim();
+	}, 2000);
+
+    function ev_mouseup(ev) {
+        if (ev.button !== 0) {
+            return;
+        }
+        var x = ev.layerX,  y = ev.layerY;
+        var R1 = Ro + dR,  I1 = Io + dR;
+        dR = -(x - 256) * scale;
+        dI = -(y - 256) * scale;
+        Ro = R1 - dR;
+        Io = I1 - dI;
+    }
+
+    var wheelHandler = function (ev) {
+        var del = 0.001;
+        if (ev.shiftKey) {
+            del = 0.1;
+        }
+        var ds = ((ev.detail || ev.wheelDelta) > 0) ? del : -del;
+        zoom += ds;
+        document.getElementById("zoom").value = Math.round(1000 * zoom) / 1000;
+        ev.preventDefault();
+    };
+    canvas.addEventListener('DOMMouseScroll', wheelHandler, false);
+    canvas.addEventListener('mousewheel', wheelHandler, false);
+}
+
+function anim(v) {
+    scale /= zoom;
+    dR /= zoom2;
+    dI /= zoom2;
+
+    // ckManZ2sm(outBuffer, scale, (Ro + dR), (Io + dI), nx);
+    JAWS.src("ckManZ2sm.js", "ckManZ2sm.cl");
+    JAWS.arg(outBuffer, scale, (Ro+dR), (Io+dI), nx);
+    JAWS.SIMD = true;
+    JAWS.ext = function() {
+        draw_gl(nx, ny, outBuffer);
+        frames++;
+
+        tripCount ++;
+        if (tripCount === tripEnd){
+			End = timeObject.gettimeofday();
+			Time = End - Start;
+			console.log("DONE: " + Time + " ms");
+            window.close();
+			return;
+		}
+        requestAnimFrame(anim);
+    };
+    JAWS.run();
+}
+
+function setFormula(s) {
+    kernel = program.createKernel(s);
+    kernel.setArg(0, bufCol);
+    scale = 0.01;
+    if (animation === "stop") {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
+function run(v) {
+    if (animation === "animate") {
+        animation = "stop";
+        document.getElementById('runBtn').value = "Run ";
+    } else {
+        animation = "animate";
+        document.getElementById('runBtn').value = "Stop";
+        anim();
+    }
+}
+
+function reset() {
+    scale = 0.01;
+}
+
+function setDelay(val) {
+    delay = parseInt(val, 10);
+}
+
+function setZoom(v) {
+    zoom = v.valueOf();
+}
+
+function fr() {
+    var ti = new Date().getTime();
+    var fps = Math.round(1000 * frames / (ti - time));
+    document.getElementById("framerate").value = fps;
+    frames = 0;
+    time = ti;
+}
+
+function toogleDevice(device) {
+    window.clearInterval(frTimer);
+    useGPU = (device === 'CPU') ? false : true;
+    mandelbrotCL();
+}
+
+</script>
+<style type="text/css">
+  h1{ font-size: 120%; color: green; }
+  h2{ font-size: 100%; color: green; }
+  pre{ color: darkblue; }
+  canvas{ position: relative; }
+</style>
+</head>
+<body onload="mandelbrotCL();">
+
+<canvas id="c"></canvas>
+
+<br><button onclick="reset();">Reset</button>
+<input type="button" onclick="run();" value="Stop" size="1" id="runBtn">
+zoom<input type="text" size="4" id="zoom" value="1.01" onchange="setZoom(this.value);">
+delay<input type="text" size="2" value="0" onchange="setDelay(this.value);">
+fps<input type="text" size="2" id="framerate">
+formula<select onchange="setFormula(this.options[this.selectedIndex].value);">
+   <option value="ckManZ2sm">z^2 sm
+   <option value="ckMandelbrot">z^2
+   <option value="ckManZ2de">z^2 de
+   <option value="ckManZ3sm">z^3 sm
+   <option value="ckManZ3">z^3
+   <option value="ckManZ4sm">z^4 sm
+   <option value="ckManZ4">z^4
+   <option value="ckMakin">Makin
+   </select>
+GPU<input type="radio" name="device" id="GPUradio" onclick="toogleDevice('GPU');" checked="true">
+CPU<input type="radio" name="device" id="CPUradio" onclick="toogleDevice('CPU');">
+
+</body></html>

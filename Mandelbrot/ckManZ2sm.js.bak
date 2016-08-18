@@ -1,0 +1,30 @@
+function ckManZ2sm(col, scale, Ro, Io, width) {
+
+    var xx = get_global_id(0);
+    var y = parseInt(xx/width);
+    var x = xx % width;
+    var maxIter = 65536;
+    // for (var x = 0; x < width; x++) {
+        // for (var y = 0; y < width; y++) {
+            var Cr = (x - 256) * scale + Ro,  Ci = -(y - 256) * scale + Io;
+            var I=0.0, R=0.0,  I2=0.0, R2=0.0;
+            var n=0;
+            while ( (R2+I2 < 100.0) && (n < maxIter) ){
+                I=(R+R)*I+Ci;  R=R2-I2+Cr;  R2=R*R;  I2=I*I;  n++;
+            }
+            if (n == maxIter) {
+                col[(y*width + x)*4] = 0;
+                col[(y*width + x)*4 + 1] = 0;
+                col[(y*width + x)*4 + 2] = 0;
+                col[(y*width + x)*4 + 3] = 255;
+            } else {
+                var cx = 1.4427*(Math.log(Math.log(R2+I2)) - 1.52718);
+                var c = parseInt(((n % 64) - cx)*24.0);
+                col[(y*width + x)*4] =     Math.min(Math.max(0, (parseInt(Math.abs(c - 768)) - 384)), 255);
+                col[(y*width + x)*4 + 1] = Math.min(Math.max(0, (512 - parseInt(Math.abs(c - 512)))), 255);
+                col[(y*width + x)*4 + 2] = Math.min(Math.max(0, (512 - parseInt(Math.abs(c - 1024)))), 255);
+                col[(y*width + x)*4 + 3] = 255;
+            }
+        // }
+    // }
+}
