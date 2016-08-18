@@ -9,7 +9,7 @@ function JAWS(nCPU) {
     this.useCPU = true;
 
 	/* Configurations */
-    var numCPU = 2;                 // number of CPU cores
+    var numCPU = 4;                 // number of CPU cores
 
     /* Measurement */
     var cpuExe = 0;
