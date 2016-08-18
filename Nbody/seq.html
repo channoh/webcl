@@ -298,7 +298,7 @@
         userData.gl  = InitGL("canvas3D");
         // userData.cl  = InitCL();
 
-        // SetSimMode(JS_SIM_MODE);
+        SetSimMode(JS_SIM_MODE);
         SetDrawMode(JS_DRAW_MODE);
         // ToggleDrawMode();
 
@@ -333,6 +333,9 @@
     <div          class="info" style="position:absolute; left:100px; top:160px; width:250px;">Particles:</div>
     <div id="num" class="info" style="position:absolute; left:350px; top:160px; width: 60px;">XX</div>
 
+    <div id="b2"  class="info" style="position:absolute; left: 30px; top:100px">
+        <button type="button"  class="btn" style="width:160px;" onClick="ToggleDrawMode()">Toggle Draw Mode</button>
+    </div>
 </div>
 
 <!-- canvas must be square since simulator works in normalized device coordinates -->
