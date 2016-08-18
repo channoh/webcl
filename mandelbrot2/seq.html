@@ -1,0 +1,39 @@
+<html>
+<head>
+<title>Sequential Mandelbrot Set Demo</title>
+<script src="config.js"></script>
+<script>
+var Start;
+var End;
+var Time;
+var timeObj = new Date();
+</script>
+<script type="text/javascript" src="lib/seq.js"></script>
+</head>
+<body> 
+<h1>Sequential Mandelbrot Set Demo</h1>
+<p><canvas id="canvas"></canvas></p>
+<button id="mode" type="button">Sequential</button>
+<p id="fps-display"> FPS </p>
+<script>
+
+
+render ();
+
+
+function render () {
+    canvas = document.getElementById("canvas");
+    canvas.width = N;
+    canvas.height = N;
+
+    width = canvas.width; height = canvas.height;
+    ctx = canvas.getContext('2d');
+    imgData = ctx.getImageData(0, 0, width, height);
+
+    doMandelBrotSequential();
+    startFPSDisplay();
+}
+</script>
+</body>
+</html>
+

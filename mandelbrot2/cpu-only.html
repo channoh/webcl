@@ -1,0 +1,58 @@
+<html>
+<head>
+<title>Mandelbrot</title>
+<script src="config.js"></script>
+<script src="lib/cpu_gpu.js"></script>
+<script src="../jslib/JAWS.js"></script>
+</head>
+
+<body>
+<p><canvas id="canvas"`></canvas></p>
+<button id="mode" type="button">work sharing</button>
+<p id="fps-display"> FPS </p>
+
+
+<script>
+canvas = document.getElementById("canvas");
+canvas.width = N;
+canvas.height = N;
+width = canvas.width;
+height = canvas.height;
+
+ctx = canvas.getContext('2d');
+imgData = ctx.getImageData(0, 0, width, height);
+
+var result = new Float32Array(width * height);
+var JAWS = new JAWS();
+
+    JAWS.src("Mandelbrot.js", "Mandelbrot.cl");
+    JAWS.arg(result, width, height, maxIterations, zoomFactor);
+    JAWS.ext = drawFig;
+    JAWS.run();
+
+
+    var elapsed = 0;
+    var prevTime = 0;
+    startFPSDisplay();
+    function drawFig() {
+        if(numFrames === 0) {
+            prevTime = Date.now();
+        }
+        else if(numFrames > 0) {
+            var curTime = Date.now();
+            elapsed +=  curTime - prevTime;
+            prevTime = curTime;
+        }
+
+        writeResult(result);
+        numFrames++;
+        zoomFactor *= 1.01;
+
+        JAWS.src("Mandelbrot.js", "Mandelbrot.cl");
+        JAWS.arg(result, width, height, maxIterations, zoomFactor);
+        JAWS.ext = drawFig;
+        JAWS.run();
+    }
+</script>
+</body>
+</html>
