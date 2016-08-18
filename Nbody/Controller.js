@@ -25,8 +25,8 @@
 * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-var WINW                = 800;          // drawing canvas width
-var WINH                = 800;          // drawing canvas height
+var WINW                = 400;          // drawing canvas width
+var WINH                = 400;          // drawing canvas height
 
 var NBODY               = N;            // default number of particles to simulate
 var INNER_FLOPS         = 25;           // number of flops in inner loop of simulation
@@ -195,16 +195,16 @@ function Draw() {
 }
 
 function SetSimMode(simMode) {
-    var div = document.getElementById("sim");
+    // var div = document.getElementById("sim");
 
-    if(simMode === JS_SIM_MODE) {
-        div.firstChild.nodeValue = "JS";
-        document.getElementById("devices").style.visibility = "hidden";
-    }
-    else {
-        div.firstChild.nodeValue = (userData.cl === null)? "NA" : "CL";
-        document.getElementById("devices").style.visibility = "visible";
-    }
+    // if(simMode === JS_SIM_MODE) {
+        // div.firstChild.nodeValue = "JS";
+        // document.getElementById("devices").style.visibility = "hidden";
+    // }
+    // else {
+        // div.firstChild.nodeValue = (userData.cl === null)? "NA" : "CL";
+        // document.getElementById("devices").style.visibility = "visible";
+    // }
 
     userData.simMode = simMode;
 }
