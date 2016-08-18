@@ -5,11 +5,11 @@ function JAWS(nCPU) {
     this.merge = [0];
     this.SIMD = false;
     this.ext = null;
-    this.debug = true;
+    this.debug = false;
     this.useCPU = true;
 
 	/* Configurations */
-    var numCPU = 8;                 // number of CPU cores
+    var numCPU = 2;                 // number of CPU cores
 
     /* Measurement */
     var cpuExe = 0;
@@ -169,7 +169,6 @@ function JAWS(nCPU) {
 
             wait ++;
             if (wait == numCPU) {
-                console.log("wait " + wait);
                 wait = 0;
                 // debug("CPU end");
                 end = timer.getTime();
@@ -326,8 +325,8 @@ function JAWS(nCPU) {
 
         if (ext != null) {
 			debug("DONE: " + (time-2000) + " ms");
-            console.log("cpuExe: " + cpuExe + " ms");
-            console.log("cpuEnd: " + cpuEnd + " ms");
+            debug("cpuExe: " + cpuExe + " ms");
+            debug("cpuEnd: " + cpuEnd + " ms");
             ext();
         }
         job.complete++;
@@ -350,7 +349,7 @@ function JAWS(nCPU) {
 
         CPU.scheduler = new Scheduler();
         CPU.thruput = 0;
-        CPU.chunkSize = 128;
+        CPU.chunkSize = 512;
 
         CPU.time = 0;
         CPU.done = 0;
