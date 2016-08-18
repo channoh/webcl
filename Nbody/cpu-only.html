@@ -142,6 +142,7 @@ function PAPLonLoad() {
 
     // SetSimMode(JS_SIM_MODE);
     SetDrawMode(JS_DRAW_MODE);
+    ToggleDrawMode();
 
     /* Run */
     // PAPLrun();
@@ -165,6 +166,7 @@ function PAPLrun() {
     JAWS.arg(userData.curPos, userData.curVel, NBODY, DT, EPSSQR, userData.nxtPos, userData.nxtVel);
     JAWS.merge = [5, 6];
     JAWS.SIMD = true;
+    JAWS.chunkSize = 256;
     JAWS.ext = function() {
         userData.curPos.set(userData.nxtPos, 0);
         userData.curVel.set(userData.nxtVel, 0);
