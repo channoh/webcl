@@ -349,7 +349,7 @@ function JAWS(nCPU) {
 
         CPU.scheduler = new Scheduler();
         CPU.thruput = 0;
-        CPU.chunkSize = 1024;
+        CPU.chunkSize = 256;
 
         CPU.time = 0;
         CPU.done = 0;
