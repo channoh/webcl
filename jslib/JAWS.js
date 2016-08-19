@@ -11,10 +11,6 @@ function JAWS(nCPU) {
 	/* Configurations */
     var numCPU = 2;                 // number of CPU cores
 
-    /* Measurement */
-    var cpuExe = 0;
-    var cpuEnd = 0;
-
     /* Global variables */
     var done;                       // completed items
     var offset;                     // next item index
@@ -29,56 +25,6 @@ function JAWS(nCPU) {
     var debug = function() {
         console.debug.apply(console, arguments);
     };
-
-
-	function Scheduler() {
-		var WindowSize = 5;
-        this.Thruput = new Array();
-        this.Time = new Array();
-
-        this.push = function(thruput, time) {
-            if (this.Thruput.length == WindowSize) {
-                this.Thruput.shift();
-                this.Time.shift();
-            }
-            this.Thruput.push(thruput);
-            this.Time.push(time);
-        };
-
-        this.getSlope = function() {
-			var slope;
-            var len = this.Thruput.length;
-            if(len == WindowSize){
-                var slope1 = (this.Thruput[len-1]-this.Thruput[len-2]) / (this.Time[len-1]-this.Time[len-2]);
-                var slope2 = (this.Thruput[len-2]-this.Thruput[len-3]) / (this.Time[len-2]-this.Time[len-3]);
-                var slope3 = (this.Thruput[len-3]-this.Thruput[len-4]) / (this.Time[len-3]-this.Time[len-4]);
-                var slope4 = (this.Thruput[len-4]-this.Thruput[len-5]) / (this.Time[len-4]-this.Time[len-5]);
-                slope = (slope1+slope2+slope3+slope4)/4;
-            }
-            else{
-                slope = -100;
-            }
-
-            return slope;
-        };
-
-    }
-
-    /* Object for measuring time */
-    var timer = new function() {
-        // var obj = new Date();
-        this.start;
-        this.end;
-        this.getTime = function() {
-            // return obj.gettimeofday();
-            return window.performance.now();
-        };
-    };
-
-
-    /* Stopwatch start */
-    timer.start = timer.getTime();
-
 
     /* job queue */
     var job = new function() {
@@ -104,9 +50,6 @@ function JAWS(nCPU) {
         var start = 0;
         var end = 0;
         this.done = 0;
-        this.time = 0;
-        this.thruput = 0;
-        this.scheduler = new Scheduler();
 
         var worker = new Array();
         for (var i=0; i<numCPU; i++) {
@@ -135,7 +78,6 @@ function JAWS(nCPU) {
         };
 
         this.run = function() {
-            start = timer.getTime();
             if (CPU.chunkSize > 0) {
                 var chunkSizePerCore = parseInt(CPU.chunkSize / numCPU);
                 if (chunkSizePerCore > 0) {
@@ -170,12 +112,6 @@ function JAWS(nCPU) {
             wait ++;
             if (wait == numCPU) {
                 wait = 0;
-                // debug("CPU end");
-                end = timer.getTime();
-                cpuEnd = end;
-                CPU.time += end - start;
-                CPU.thruput = CPU.done/CPU.time;
-                CPU.scheduler.push(CPU.thruput, end);
 
                 if (DATA_SIZE - offset >= CPU.chunkSize) {
                     CPU.run();
@@ -317,16 +253,8 @@ function JAWS(nCPU) {
     /* the end of a job */
     function finishJob() {
         /* Stopwatch end */
-        timer.end = timer.getTime();
-        var time = timer.end - timer.start;
-        // debug("DONE: " + (time-2000) + " ms");
-        debug("CPU works: " + CPU.time + " ms (" + CPU.done + " elements)");
-        cpuExe += CPU.time;
 
         if (ext != null) {
-			debug("DONE: " + (time-2000) + " ms");
-            debug("cpuExe: " + cpuExe + " ms");
-            debug("cpuEnd: " + cpuEnd + " ms");
             ext();
         }
         job.complete++;
@@ -347,13 +275,8 @@ function JAWS(nCPU) {
             DATA_SIZE /= 4;
         ext = job.ext[i];
 
-        CPU.scheduler = new Scheduler();
-        CPU.thruput = 0;
         CPU.chunkSize = 256;
 
-        CPU.time = 0;
-        CPU.done = 0;
-        
         debug("DATA_SIZE: " + DATA_SIZE);
         debug("init CPU chunkSize: " + CPU.chunkSize);
 
